@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 
-mongoose.connect('mongodb://localhost:27017/markdown_viewer', {
+mongoose.connect('mongodb://0.0.0.0:27017/markdown_viewer', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
