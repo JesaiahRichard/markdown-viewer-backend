@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-mongoose.connect('mongodb://localhost:27017', {
+mongoose.connect('mongodb+srv://jesaiahrichard:hello12345@cluster0.ucpc5uu.mongodb.net/?retryWrites=true&w=majority', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -108,7 +108,6 @@ app.delete('/api/markdown', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-// Existing backend code remains the same
 
 app.put('/api/markdown/:id', async (req, res) => {
   const { id } = req.params;
