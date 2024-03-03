@@ -4,11 +4,12 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const config = require('./config');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-mongoose.connect('mongodb+srv://jesaiahrichard:hello12345@cluster0.ucpc5uu.mongodb.net/?retryWrites=true&w=majority', {
+mongoose.connect(config.mongoURI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
