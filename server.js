@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -12,60 +14,81 @@ mongoose.connect('mongodb+srv://jesaiahrichard:hello12345@cluster0.ucpc5uu.mongo
 });
 
 const userSchema = new mongoose.Schema({
-  username: String,
-  password: String,
+  username: { type: String, unique: true, required: true },
+  password: { type: String, required: true },
 });
 
 const User = mongoose.model('User', userSchema);
 
 const markdownSchema = new mongoose.Schema({
   content: String,
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
 const Markdown = mongoose.model('Markdown', markdownSchema);
 
 app.use(bodyParser.json());
 app.use(cors());
-app.get('/', (req, res) => {
-  res.send('Hello, this is the Markdown Viewer API!');
-});
-
-
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    const user = await User.findOne({ username, password });
-    if (user) {
-      res.json({ success: true });
-    } else {
-      res.json({ success: false });
-    }
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
 
 app.post('/api/signup', async (req, res) => {
   const { username, password } = req.body;
 
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
   try {
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      res.json({ success: false, message: 'Username already exists' });
-    } else {
-      const newUser = new User({ username, password });
-      await newUser.save();
-      res.json({ success: true, message: 'User created successfully' });
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({ username, password: hashedPassword });
+    await newUser.save();
+    res.json({ success: true, message: 'Signup successful' });
   } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  try {
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Invalid username or password' });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ success: false, error: 'Invalid username or password' });
+    }
+
+    const token = jwt.sign({ userId: user._id }, 'secret', { expiresIn: '1h' });
+    res.json({ success: true, token });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal Server Error' });
+  }
+});
+
+app.use((req, res, next) => {
+  const token = req.headers.authorization;
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  try {
+    const decoded = jwt.verify(token, 'secret');
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 });
 
 app.get('/api/markdown', async (req, res) => {
   try {
-    const markdownContent = await Markdown.find();
+    const markdownContent = await Markdown.find({ user: req.userId });
     res.json(markdownContent);
   } catch (error) {
     res.status(500).json({ error: 'Internal Server Error' });
@@ -75,8 +98,12 @@ app.get('/api/markdown', async (req, res) => {
 app.post('/api/markdown', async (req, res) => {
   const { content } = req.body;
 
+  if (!content) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+
   try {
-    const newMarkdown = new Markdown({ content });
+    const newMarkdown = new Markdown({ content, user: req.userId });
     await newMarkdown.save();
     res.status(201).json(newMarkdown);
   } catch (error) {
@@ -88,7 +115,7 @@ app.delete('/api/markdown/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const deletedMarkdown = await Markdown.findByIdAndRemove(id);
+    const deletedMarkdown = await Markdown.findOneAndDelete({ _id: id, user: req.userId });
 
     if (!deletedMarkdown) {
       return res.status(404).json({ error: 'Markdown content not found' });
@@ -99,33 +126,6 @@ app.delete('/api/markdown/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
-app.delete('/api/markdown', async (req, res) => {
-  try {
-    await Markdown.deleteMany({});
-    res.json({ message: 'All Markdown content deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-app.put('/api/markdown/:id', async (req, res) => {
-  const { id } = req.params;
-  const { content } = req.body;
-
-  try {
-    const updatedMarkdown = await Markdown.findByIdAndUpdate(id, { content }, { new: true });
-
-    if (!updatedMarkdown) {
-      return res.status(404).json({ error: 'Markdown content not found' });
-    }
-
-    res.json(updatedMarkdown);
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
