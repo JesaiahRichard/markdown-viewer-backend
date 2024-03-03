@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+const bcryptjs = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   try {
-    const hashedPassword = await bcrypt.hash(this.password, 10);
+    const hashedPassword = await bcryptjs.hash(this.password, 10);
     this.password = hashedPassword;
     next();
   } catch (error) {
@@ -50,7 +50,7 @@ app.post('/api/login', async (req, res) => {
     if (!user) {
       return res.json({ success: false, message: 'Invalid username or password' });
     }
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = await bcryptjs.compare(password, user.password);
     if (!passwordMatch) {
       return res.json({ success: false, message: 'Invalid username or password' });
     }
